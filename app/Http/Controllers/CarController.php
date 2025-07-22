@@ -7,6 +7,12 @@ use Illuminate\Http\Request;
 
 class CarController extends Controller
 {
+    public function index()
+    {
+        $cars = Car::all();
+        return view('cars.index', compact('cars'));
+    }
+
     public function create()
     {
         return view('cars.create');
