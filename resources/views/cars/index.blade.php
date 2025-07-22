@@ -31,6 +31,7 @@
                     <th>Export Option</th>
                     <th>Additional Info</th>
                     <th>Description</th>
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -54,6 +55,9 @@
                         <td>{{ $car->export_option ? 'Yes' : 'No' }}</td>
                         <td>{{ $car->additional_info ?? 'N/A' }}</td>
                         <td>{{ $car->description ?? 'N/A' }}</td>
+                        <td>
+                            <a href="{{ route('cars.show', $car->id) }}" class="btn btn-sm btn-info">Details</a>
+                        </td>
                     </tr>
                 @endforeach
             </tbody>

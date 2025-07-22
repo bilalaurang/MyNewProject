@@ -36,7 +36,7 @@ class CarController extends Controller
             'interior_color' => 'required|string|max:50',
             'seats' => 'required|integer|min:1',
             'doors' => 'required|integer|min:1',
-            'engine_size' => 'required|numeric|min:0',
+            'engine_size' => 'required|numeric|min:0|max:9999.9',
             'horsepower' => 'required|integer|min:0',
             'description' => 'nullable|string',
         ]);
@@ -44,5 +44,11 @@ class CarController extends Controller
         Car::create($request->all());
 
         return redirect()->route('cars.create')->with('success', 'Car details saved successfully!');
+    }
+
+    public function show($id)
+    {
+        $car = Car::findOrFail($id);
+        return view('cars.show', compact('car'));
     }
 }
