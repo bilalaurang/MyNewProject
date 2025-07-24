@@ -41,6 +41,7 @@ class CarsController extends Controller
             'interior_color' => 'required|string|max:255',
             'seats' => 'required|integer|min:1',
             'doors' => 'required|integer|min:1',
+            'showroom_info' => 'nullable|string|max:1000', // Optional
         ]);
 
         $description = $this->generateAIDescription($validated);
@@ -60,9 +61,24 @@ class CarsController extends Controller
 
     private function generateAIDescription($data)
     {
-        Log::info('Attempting Gemini API call', ['prompt' => "Generate a 50-100 word description for a {$data['year']} {$data['make']} {$data['model']}..."]);
+        $carPrompt = "Generate a 50-100 word description for a {$data['year']} {$data['make']} {$data['model']} with {$data['kilometers']} km, {$data['color']} color, {$data['body_condition']} body condition, {$data['mechanical_condition']} mechanical condition, {$data['engine_size']}L engine, {$data['horsepower']} hp, top speed of {$data['top_speed']} km/h, {$data['steering_side']} steering, {$data['wheel_size']} inch wheels, {$data['interior_color']} interior, {$data['seats']} seats, and {$data['doors']} doors. Price: \${$data['price']}. Create a unique, engaging description with varied tone, style, and additional details (e.g., driving experience, design highlights) to differentiate it from other car descriptions.";
+        
+        $carDescription = $this->callGeminiAPI($carPrompt, 'Car Description', $data);
+        
+        if (!empty($data['showroom_info'])) {
+            $showroomPrompt = "Generate a 30-50 word professional description for a car showroom or company based on the following raw input: '{$data['showroom_info']}'. Include a professional tone, highlight expertise, quality, or unique aspects, and end with an invitation to visit or explore their collection.";
+            $showroomDescription = $this->callGeminiAPI($showroomPrompt, 'Showroom Description', $data);
+            $showroomSection = "\n\nAbout the Showroom\n$showroomDescription\n\nContact Us\nOffice: Not provided\nSales: Not provided\nWebsite: www.example.com\nLocation: Not provided\nOpen: 7 days a week, 10 AM to 9 PM (Sunday 10 AM to 7 PM)\n\nStay Connected\nInstagram: instagram.com/example\nFacebook: facebook.com/example";
+            return $carDescription . $showroomSection;
+        }
+        
+        return $carDescription;
+    }
+
+    private function callGeminiAPI($prompt, $logContext, $data)
+    {
+        Log::info("Attempting Gemini API call for $logContext", ['prompt' => $prompt]);
         try {
-            $prompt = "Generate a 50-100 word description for a {$data['year']} {$data['make']} {$data['model']} with {$data['kilometers']} km, {$data['color']} color, {$data['body_condition']} body condition, {$data['mechanical_condition']} mechanical condition, {$data['engine_size']}L engine, {$data['horsepower']} hp, top speed of {$data['top_speed']} km/h, {$data['steering_side']} steering, {$data['wheel_size']} inch wheels, {$data['interior_color']} interior, {$data['seats']} seats, and {$data['doors']} doors. Price: \${$data['price']}. Create a unique, engaging description with varied tone, style, and additional details (e.g., driving experience, design highlights) to differentiate it from other car descriptions.";
             $response = Http::withHeaders([
                 'Content-Type' => 'application/json',
                 'x-goog-api-key' => env('GEMINI_API_KEY'),
@@ -75,55 +91,58 @@ class CarsController extends Controller
                     ],
                 ],
                 'generationConfig' => [
-                    'maxOutputTokens' => 150,
+                    'maxOutputTokens' => 200, // Increased for car (100) + showroom (50) + buffer
                     'temperature' => 0.9,
                 ],
             ]);
             $result = $response->json();
-            Log::info('Gemini API Response', ['response' => $result]);
+            Log::info("Gemini API Response for $logContext", ['response' => $result]);
             if (isset($result['candidates'][0]['content']['parts'][0]['text'])) {
                 return trim($result['candidates'][0]['content']['parts'][0]['text']);
             }
-            throw new \Exception('No description returned from Gemini API');
+            throw new \Exception("No description returned from Gemini API for $logContext");
         } catch (\Exception $e) {
-            Log::error('AI Description Error: ' . $e->getMessage());
-            $introPhrases = [
-                'Step into the driver’s seat of this',
-                'Unleash the potential of this',
-                'Experience the allure of this',
-                'Command the road with this',
-                'Discover the charm of this',
-                'Feel the pulse of this',
-            ];
-            $stylePhrases = [
-                'boasting sleek lines and bold styling',
-                'with a timeless design that turns heads',
-                'featuring aggressive contours and sporty flair',
-                'crafted with elegance and sophistication',
-                'showcasing a rugged yet refined look',
-            ];
-            $drivePhrases = [
-                'perfect for thrilling weekend drives',
-                'ideal for smooth city commutes',
-                'built for high-performance adventures',
-                'designed for comfort on long journeys',
-                'tailored for dynamic handling and fun',
-            ];
-            $closingPhrases = [
-                'Grab this automotive masterpiece today!',
-                'Your dream ride awaits—don’t miss out!',
-                'A rare find for enthusiasts and collectors!',
-                'Ready to redefine your driving experience!',
-                'Seize this chance to own a legend!',
-            ];
-            $intro = $introPhrases[array_rand($introPhrases)];
-            $style = $stylePhrases[array_rand($stylePhrases)];
-            $drive = $drivePhrases[array_rand($drivePhrases)];
-            $closing = $closingPhrases[array_rand($closingPhrases)];
-            $conditionAdjective = strtolower($data['body_condition']) === 'best' ? 'pristine' : 'well-maintained';
-            $powerAdjective = $data['horsepower'] > 500 ? 'exhilarating' : 'reliable';
-            $priceAdjective = $data['price'] < 5000 ? 'budget-friendly' : 'premium';
-            return "$intro $conditionAdjective {$data['year']} {$data['make']} {$data['model']} with only {$data['kilometers']} km. Priced at \${$data['price']}, this $priceAdjective ride offers a $powerAdjective {$data['engine_size']}L engine with {$data['horsepower']} hp and a top speed of {$data['top_speed']} km/h. It features {$data['steering_side']} steering, {$data['wheel_size']} inch wheels, a {$data['interior_color']} interior, {$data['seats']} seats, and {$data['doors']} doors, $style. $drive. $closing";
+            Log::error("AI Description Error for $logContext: " . $e->getMessage());
+            if ($logContext === 'Car Description') {
+                $introPhrases = [
+                    'Step into the driver’s seat of this',
+                    'Unleash the potential of this',
+                    'Experience the allure of this',
+                    'Command the road with this',
+                    'Discover the charm of this',
+                    'Feel the pulse of this',
+                ];
+                $stylePhrases = [
+                    'boasting sleek lines and bold styling',
+                    'with a timeless design that turns heads',
+                    'featuring aggressive contours and sporty flair',
+                    'crafted with elegance and sophistication',
+                    'showcasing a rugged yet refined look',
+                ];
+                $drivePhrases = [
+                    'perfect for thrilling weekend drives',
+                    'ideal for smooth city commutes',
+                    'built for high-performance adventures',
+                    'designed for comfort on long journeys',
+                    'tailored for dynamic handling and fun',
+                ];
+                $closingPhrases = [
+                    'Grab this automotive masterpiece today!',
+                    'Your dream ride awaits—don’t miss out!',
+                    'A rare find for enthusiasts and collectors!',
+                    'Ready to redefine your driving experience!',
+                    'Seize this chance to own a legend!',
+                ];
+                $intro = $introPhrases[array_rand($introPhrases)];
+                $style = $stylePhrases[array_rand($stylePhrases)];
+                $drive = $drivePhrases[array_rand($drivePhrases)];
+                $closing = $closingPhrases[array_rand($closingPhrases)];
+                $conditionAdjective = strtolower($data['body_condition']) === 'best' ? 'pristine' : 'well-maintained';
+                $powerAdjective = $data['horsepower'] > 500 ? 'exhilarating' : 'reliable';
+                $priceAdjective = $data['price'] < 5000 ? 'budget-friendly' : 'premium';
+                return "$intro $conditionAdjective {$data['year']} {$data['make']} {$data['model']} with only {$data['kilometers']} km. Priced at \${$data['price']}, this $priceAdjective ride offers a $powerAdjective {$data['engine_size']}L engine with {$data['horsepower']} hp and a top speed of {$data['top_speed']} km/h. It features {$data['steering_side']} steering, {$data['wheel_size']} inch wheels, a {$data['interior_color']} interior, {$data['seats']} seats, and {$data['doors']} doors, $style. $drive. $closing";
+            }
+            return "Showroom information unavailable.";
         }
     }
 }
