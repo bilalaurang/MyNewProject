@@ -24,78 +24,113 @@ class CarsController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'make' => 'required|string|max:255',
-            'model' => 'required|string|max:255',
-            'year' => 'required|integer|min:1900|max:'.(date('Y') + 1),
-            'price' => 'required|numeric|min:0',
-            'kilometers' => 'required|numeric|min:0',
-            'color' => 'required|string|max:255',
-            'body_condition' => 'required|string|max:255',
-            'mechanical_condition' => 'required|string|max:255',
-            'engine_size' => 'required|numeric|min:0',
-            'horsepower' => 'required|integer|min:0',
-            'top_speed' => 'required|integer|min:0',
-            'steering_side' => 'required|in:left,right',
-            'wheel_size' => 'required|string|max:255',
-            'interior_color' => 'required|string|max:255',
-            'seats' => 'required|integer|min:1',
-            'doors' => 'required|integer|min:1',
-            'showroom_info' => 'nullable|string|max:1000',
-        ]);
+        Log::info('Store: Received request data', $request->all());
 
-        $description = $this->generateAIDescription($validated);
-        Log::info('Store: Validated Data', $validated);
-        Log::info('Store: Generated Description', ['description' => $description]);
-        $car = Car::create(array_merge($validated, ['description' => $description]));
-        Log::info('Store: Car saved', ['car_id' => $car->getKey()]);
+        try {
+            $validated = $request->validate([
+                'make' => 'required|string|regex:/^[a-zA-Z\s]+$/|max:255',
+                'model' => 'required|string|regex:/^[a-zA-Z\s]+$/|max:255',
+                'year' => 'required|integer|min:1900|max:' . (date('Y') + 1),
+                'price' => 'required|numeric|min:0',
+                'kilometers' => 'required|numeric|min:0',
+                'color' => 'required|string|regex:/^[a-zA-Z\s]+$/|max:255',
+                'body_condition' => 'required|string|regex:/^[a-zA-Z\s]+$/|max:255',
+                'mechanical_condition' => 'required|string|regex:/^[a-zA-Z\s]+$/|max:255',
+                'engine_size' => 'required|numeric|min:0',
+                'horsepower' => 'required|integer|min:0',
+                'top_speed' => 'required|integer|min:0',
+                'steering_side' => 'required|in:left,right',
+                'wheel_size' => 'required|string|regex:/^[a-zA-Z0-9\s]+$/|max:255',
+                'interior_color' => 'required|string|regex:/^[a-zA-Z\s]+$/|max:255',
+                'seats' => 'required|integer|min:1',
+                'doors' => 'required|integer|min:1',
+                'showroom_info' => 'nullable|string|max:1000',
+            ]);
 
-        return redirect()->route('cars.index')->with('success', 'Car added successfully!');
+            $description = $this->generateAIDescription($validated);
+            Log::info('Store: Validated Data', $validated);
+            Log::info('Store: Generated Description', ['description' => $description]);
+
+            $car = Car::create(array_merge($validated, ['description' => $description]));
+            Log::info('Store: Car saved successfully', ['car_id' => $car->getKey()]);
+
+            return redirect()->route('cars.index')->with('success', 'Car added successfully!');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::error('Store: Validation failed', ['errors' => $e->errors(), 'input' => $request->all()]);
+            return redirect()->back()->withErrors($e->errors())->withInput();
+        } catch (\Exception $e) {
+            Log::error('Store: Failed to save car', ['error' => $e->getMessage(), 'input' => $request->all()]);
+            return redirect()->back()->with('error', 'Failed to add car. Check logs: ' . $e->getMessage())->withInput();
+        }
     }
 
     public function show(Car $car)
     {
-        Log::info('Show: Car details', $car->toArray());
+        // Fetch the latest data from the database
+        $car = Car::findOrFail($car->id);
+        Log::info('Show: Car details (refetched)', $car->toArray());
         return view('car-detail', compact('car'));
     }
 
     public function update(Request $request, Car $car)
     {
-        $validated = $request->validate([
-            'make' => 'required|string|max:255',
-            'model' => 'required|string|max:255',
-            'year' => 'required|integer|min:1900|max:'.(date('Y') + 1),
-            'price' => 'required|numeric|min:0',
-            'kilometers' => 'required|numeric|min:0',
-            'color' => 'required|string|max:255',
-            'body_condition' => 'required|string|max:255',
-            'mechanical_condition' => 'required|string|max:255',
-            'engine_size' => 'required|numeric|min:0',
-            'horsepower' => 'required|integer|min:0',
-            'top_speed' => 'required|integer|min:0',
-            'steering_side' => 'required|in:left,right',
-            'wheel_size' => 'required|string|max:255',
-            'interior_color' => 'required|string|max:255',
-            'seats' => 'required|integer|min:1',
-            'doors' => 'required|integer|min:1',
-            'description' => 'nullable|string|max:1000',
-            'showroom_info' => 'nullable|string|max:1000',
-        ]);
+        Log::info('Update: Received request data', $request->all());
 
-        $description = $request->input('description', $this->generateAIDescription($validated));
-        Log::info('Update: Validated Data before save', $validated);
-        Log::info('Update: Description before save', ['description' => $description]);
+        // Get current and submitted description
+        $currentDescription = $car->description ?? '';
+        $submittedDescription = $request->input('description');
+        $isDescriptionModified = $request->input('description_modified', '0') === '1';
 
+        // Validate all fields except description
         try {
-            $car->update(array_merge($validated, ['description' => $description]));
-            $updatedCar = Car::find($car->getKey()); // Fetch fresh data
-            Log::info('Update: Car updated successfully', ['car_id' => $car->getKey(), 'updated_data' => $updatedCar->toArray()]);
+            $validatedData = $request->validate([
+                'make' => 'required|string|regex:/^[a-zA-Z\s]+$/|max:255',
+                'model' => 'required|string|regex:/^[a-zA-Z\s]+$/|max:255',
+                'year' => 'required|integer|min:1900|max:' . (date('Y') + 1),
+                'price' => 'required|numeric|min:0',
+                'kilometers' => 'required|numeric|min:0',
+                'color' => 'required|string|regex:/^[a-zA-Z\s]+$/|max:255',
+                'body_condition' => 'required|string|regex:/^[a-zA-Z\s]+$/|max:255',
+                'mechanical_condition' => 'required|string|regex:/^[a-zA-Z\s]+$/|max:255',
+                'engine_size' => 'required|numeric|min:0',
+                'horsepower' => 'required|integer|min:0',
+                'top_speed' => 'required|integer|min:0',
+                'steering_side' => 'required|in:left,right',
+                'wheel_size' => 'required|string|regex:/^[a-zA-Z0-9\s]+$/|max:255',
+                'interior_color' => 'required|string|regex:/^[a-zA-Z\s]+$/|max:255',
+                'seats' => 'required|integer|min:1',
+                'doors' => 'required|integer|min:1',
+                'showroom_info' => 'nullable|string|max:1000',
+            ]);
+
+            // Handle description only if modified
+            $description = $currentDescription;
+            if ($isDescriptionModified && $submittedDescription !== null) {
+                if (strlen($submittedDescription) > 1000) {
+                    return redirect()->back()->withErrors(['description' => 'The description must not be greater than 1000 characters.'])->withInput();
+                }
+                $description = $submittedDescription;
+            }
+            Log::info('Update: Description handled', ['modified' => $isDescriptionModified, 'current' => $currentDescription, 'submitted' => $submittedDescription, 'final' => $description]);
+
+            $dataToUpdate = array_merge($validatedData, ['description' => $description]);
+            Log::info('Update: Data to save', $dataToUpdate);
+
+            $car->fill($dataToUpdate);
+            $car->save();
+            $updatedCar = Car::findOrFail($car->id);
+            Log::info('Update: Car updated successfully', ['car_id' => $car->id, 'updated_data' => $updatedCar->toArray()]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::error('Update: Validation failed', ['errors' => $e->errors(), 'input' => $request->all()]);
+            return redirect()->back()->withErrors($e->errors())->withInput();
         } catch (\Exception $e) {
-            Log::error('Update: Failed to update car', ['error' => $e->getMessage(), 'data' => $validated]);
-            return redirect()->back()->with('error', 'Failed to update car. Check logs: ' . $e->getMessage());
+            Log::error('Update: Failed to update car', ['error' => $e->getMessage(), 'input' => $request->all()]);
+            return redirect()->back()->with('error', 'Failed to update car. Check logs: ' . $e->getMessage())->withInput();
         }
 
-        return redirect()->route('cars.show', $car->getKey())->with('success', 'Car updated successfully!')->with('updated_car', $updatedCar);
+        // Force refresh with cache-busting parameter
+        $cacheBust = time();
+        return redirect()->route('cars.show', [$car->id, 'cache' => $cacheBust])->with('success', 'Car updated successfully!');
     }
 
     private function generateAIDescription($data)
