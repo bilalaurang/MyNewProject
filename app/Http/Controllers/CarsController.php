@@ -41,14 +41,14 @@ class CarsController extends Controller
             'interior_color' => 'required|string|max:255',
             'seats' => 'required|integer|min:1',
             'doors' => 'required|integer|min:1',
-            'showroom_info' => 'nullable|string|max:1000', // Optional
+            'showroom_info' => 'nullable|string|max:1000',
         ]);
 
         $description = $this->generateAIDescription($validated);
         Log::info('Store: Validated Data', $validated);
         Log::info('Store: Generated Description', ['description' => $description]);
         $car = Car::create(array_merge($validated, ['description' => $description]));
-        Log::info('Store: Car saved', ['car_id' => $car->id]);
+        Log::info('Store: Car saved', ['car_id' => $car->getKey()]);
 
         return redirect()->route('cars.index')->with('success', 'Car added successfully!');
     }
@@ -59,6 +59,45 @@ class CarsController extends Controller
         return view('car-detail', compact('car'));
     }
 
+    public function update(Request $request, Car $car)
+    {
+        $validated = $request->validate([
+            'make' => 'required|string|max:255',
+            'model' => 'required|string|max:255',
+            'year' => 'required|integer|min:1900|max:'.(date('Y') + 1),
+            'price' => 'required|numeric|min:0',
+            'kilometers' => 'required|numeric|min:0',
+            'color' => 'required|string|max:255',
+            'body_condition' => 'required|string|max:255',
+            'mechanical_condition' => 'required|string|max:255',
+            'engine_size' => 'required|numeric|min:0',
+            'horsepower' => 'required|integer|min:0',
+            'top_speed' => 'required|integer|min:0',
+            'steering_side' => 'required|in:left,right',
+            'wheel_size' => 'required|string|max:255',
+            'interior_color' => 'required|string|max:255',
+            'seats' => 'required|integer|min:1',
+            'doors' => 'required|integer|min:1',
+            'description' => 'nullable|string|max:1000',
+            'showroom_info' => 'nullable|string|max:1000',
+        ]);
+
+        $description = $request->input('description', $this->generateAIDescription($validated));
+        Log::info('Update: Validated Data before save', $validated);
+        Log::info('Update: Description before save', ['description' => $description]);
+
+        try {
+            $car->update(array_merge($validated, ['description' => $description]));
+            $updatedCar = Car::find($car->getKey()); // Fetch fresh data
+            Log::info('Update: Car updated successfully', ['car_id' => $car->getKey(), 'updated_data' => $updatedCar->toArray()]);
+        } catch (\Exception $e) {
+            Log::error('Update: Failed to update car', ['error' => $e->getMessage(), 'data' => $validated]);
+            return redirect()->back()->with('error', 'Failed to update car. Check logs: ' . $e->getMessage());
+        }
+
+        return redirect()->route('cars.show', $car->getKey())->with('success', 'Car updated successfully!')->with('updated_car', $updatedCar);
+    }
+
     private function generateAIDescription($data)
     {
         $carPrompt = "Generate a 50-100 word description for a {$data['year']} {$data['make']} {$data['model']} with {$data['kilometers']} km, {$data['color']} color, {$data['body_condition']} body condition, {$data['mechanical_condition']} mechanical condition, {$data['engine_size']}L engine, {$data['horsepower']} hp, top speed of {$data['top_speed']} km/h, {$data['steering_side']} steering, {$data['wheel_size']} inch wheels, {$data['interior_color']} interior, {$data['seats']} seats, and {$data['doors']} doors. Price: \${$data['price']}. Create a unique, engaging description with varied tone, style, and additional details (e.g., driving experience, design highlights) to differentiate it from other car descriptions.";
@@ -66,7 +105,7 @@ class CarsController extends Controller
         $carDescription = $this->callGeminiAPI($carPrompt, 'Car Description', $data);
         
         if (!empty($data['showroom_info'])) {
-            $showroomPrompt = "Generate a 30-50 word professional description for a car showroom or company based on the following raw input: '{$data['showroom_info']}'. Include a professional tone, highlight expertise, quality, or unique aspects, and end with an invitation to visit or explore their collection.";
+            $showroomPrompt = "Generate a 50-70 word professional description for a car showroom or company based on the following raw input: '{$data['showroom_info']}'. Include a professional tone, highlight expertise, quality, or unique aspects, and end with an invitation to visit or explore their collection.";
             $showroomDescription = $this->callGeminiAPI($showroomPrompt, 'Showroom Description', $data);
             $showroomSection = "\n\nAbout the Showroom\n$showroomDescription\n\nContact Us\nOffice: Not provided\nSales: Not provided\nWebsite: www.example.com\nLocation: Not provided\nOpen: 7 days a week, 10 AM to 9 PM (Sunday 10 AM to 7 PM)\n\nStay Connected\nInstagram: instagram.com/example\nFacebook: facebook.com/example";
             return $carDescription . $showroomSection;
@@ -91,7 +130,7 @@ class CarsController extends Controller
                     ],
                 ],
                 'generationConfig' => [
-                    'maxOutputTokens' => 200, // Increased for car (100) + showroom (50) + buffer
+                    'maxOutputTokens' => 200,
                     'temperature' => 0.9,
                 ],
             ]);
