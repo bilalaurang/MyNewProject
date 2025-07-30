@@ -12,12 +12,32 @@
         .car-info { margin-bottom: 20px; }
         .car-info p { margin: 6px 0; font-size: 1.1rem; }
         .car-info p strong { background: #eef1f4ff; color: #000; padding: 4px 8px; border-radius: 4px; }
-        .section-title { font-size: 1.2rem; color: #003087; margin: 25px 0 12px; font-weight: 600; }
-        .description { white-space: pre-wrap; line-height: 1.6; font-size: 1.1rem; color: #333; background: #f0f0f0; padding: 12px; border-radius: 6px; }
-        .additional-details { margin-top: 20px; padding: 12px; background: #e9ecef; border-radius: 6px; font-size: 1.1rem; color: #333; }
+        .section-title { font-size: 1.2rem; color: #003087; margin: 25px 0 0; font-weight: 600; }
+        .description { 
+            font-size: 1.1rem; 
+            color: #333; 
+            background: #f0f0f0; 
+            border-radius: 6px; 
+            text-align: left; 
+            line-height: 1.2; 
+            margin: 0; 
+            padding: 0; 
+            overflow: hidden; /* Prevent overflow issues */
+        }
+        .description-content { 
+            padding: 12px; /* Internal padding for content */
+            margin: 0; /* Remove any margin */
+        }
+        .additional-details { 
+            margin-top: 20px; 
+            padding: 12px; 
+            background: #e9ecef; 
+            border-radius: 6px; 
+            font-size: 1.1rem; 
+            color: #333; 
+        }
         .additional-details ul { list-style-type: none; padding: 0; }
         .additional-details li { margin: 5px 0; }
-        .showroom-contact { margin-top: 20px; padding: 12px; background: #e9ecef; border-radius: 6px; font-size: 1.1rem; color: #333; }
         .btn-primary { background: #007bff; color: #fff; padding: 12px 25px; border: none; border-radius: 6px; transition: background 0.3s; }
         .btn-primary:hover { background: #0056b3; }
         .alert-success { background: #d4edda; color: #155724; padding: 12px; border-radius: 6px; margin-bottom: 18px; }
@@ -70,22 +90,51 @@
                     <p><strong>Seats:</strong> {{ $car->seats }}</p>
                     <p><strong>Doors:</strong> {{ $car->doors }}</p>
                 </div>
-                <div class="section-title">Description</div>
-                <div class="description">{!! nl2br(e(str_replace('$', '', $car->description))) !!}</div>
-                <div class="section-title">Extra Features</div>
-                <div class="additional-details">
-                    <ul>
-                        @foreach (explode("\n", $additionalDetails) as $detail)
-                            @if (trim($detail) !== '')
-                                <li>{{ trim($detail) }}</li>
+                @if(!empty($descriptions['description']) || !empty($descriptions['showroom']))
+                    <div class="section-title">Description 1</div>
+                    <div class="description">
+                        <div class="description-content">
+                            @if(!empty($descriptions['description']))
+                                {{ str_replace('$', '', $descriptions['description']) }}<br>
                             @endif
-                        @endforeach
-                    </ul>
-                </div>
-                @if (strpos($car->description, 'About the Showroom') !== false)
-                    <div class="section-title">Showroom</div>
-                    <div class="showroom-contact">
-                        {!! nl2br(e(str_replace('$', '', substr($car->description, strpos($car->description, 'About the Showroom'))))) !!}
+                            @if(!empty($descriptions['showroom']))
+                                {{ str_replace('$', '', $descriptions['showroom']) }}<br>
+                            @endif
+                        </div>
+                    </div>
+                @endif
+                @if(!empty($descriptions['main_features']))
+                    <div class="section-title">Description 2</div>
+                    <div class="description">
+                        <div class="description-content">
+                            <ul>
+                                @foreach (explode("\n", $descriptions['main_features']) as $feature)
+                                    @if (trim($feature) !== '' && strpos(trim($feature), '•') === 0)
+                                        <li>{{ trim(str_replace('•', '', $feature)) }}</li>
+                                    @endif
+                                @endforeach
+                            </ul>
+                        </div>
+                    </div>
+                @endif
+                @if(!empty($descriptions['mixed_overview']))
+                    <div class="section-title">Description 3</div>
+                    <div class="description">
+                        <div class="description-content">
+                            {{ str_replace('$', '', $descriptions['mixed_overview']) }}
+                        </div>
+                    </div>
+                @endif
+                @if(!empty($additionalDetails))
+                    <div class="section-title">Additional Features</div>
+                    <div class="additional-details">
+                        <ul>
+                            @foreach (explode("\n", trim($additionalDetails)) as $detail)
+                                @if (trim($detail) !== '')
+                                    <li>{{ trim($detail) }}</li>
+                                @endif
+                            @endforeach
+                        </ul>
                     </div>
                 @endif
                 <a href="{{ route('cars.index') }}" class="btn btn-primary mt-3">Back to Listings</a>
@@ -171,7 +220,7 @@
                     </div>
                     <div class="form-group">
                         <label for="description">Description</label>
-                        <textarea name="description" id="description" class="form-control" oninput="document.getElementById('description_modified').value = '1';">{{ old('description', str_replace('$', '', $car->description)) }}</textarea>
+                        <textarea name="description" id="description" class="form-control" oninput="document.getElementById('description_modified').value = '1';">{{ old('description', $car->description) }}</textarea>
                     </div>
                     <div class="form-group">
                         <label for="showroom_info">Showroom Info</label>

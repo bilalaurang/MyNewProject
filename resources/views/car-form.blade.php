@@ -15,8 +15,10 @@
         .btn-primary { background: #007bff; color: #fff; padding: 12px 25px; border: none; border-radius: 6px; font-size: 1.1rem; transition: background 0.3s; }
         .btn-primary:hover { background: #0056b3; }
         .alert-success { background: #d4edda; color: #155724; padding: 12px; border-radius: 6px; margin-bottom: 18px; }
+        .alert-error { background: #f8d7da; color: #721c24; padding: 12px; border-radius: 6px; margin-bottom: 18px; }
         .section-title { font-size: 1.2rem; color: #003087; margin: 25px 0 12px; font-weight: 600; }
         textarea { resize: vertical; }
+        .required-star { color: red; margin-left: 5px; }
     </style>
 </head>
 <body>
@@ -31,117 +33,129 @@
                         {{ session('success') }}
                     </div>
                 @endif
+                @if ($errors->any())
+                    <div class="alert alert-error">
+                        <ul>
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
                 <form action="{{ route('cars.store') }}" method="POST">
                     @csrf
                     <div class="section-title">Car Details</div>
                     <div class="form-group">
-                        <label for="make">Make:</label>
-                        <input type="text" name="make" id="make" class="form-control" required>
+                        <label for="make">Make:<span class="required-star">*</span></label>
+                        <input type="text" name="make" id="make" class="form-control" value="{{ old('make') }}" required>
                     </div>
                     <div class="form-group">
-                        <label for="model">Model:</label>
-                        <input type="text" name="model" id="model" class="form-control" required>
+                        <label for="model">Model:<span class="required-star">*</span></label>
+                        <input type="text" name="model" id="model" class="form-control" value="{{ old('model') }}" required>
                     </div>
                     <div class="form-group">
-                        <label for="year">Year:</label>
-                        <input type="number" name="year" id="year" class="form-control" required min="1900" max="{{ date('Y') + 1 }}">
+                        <label for="year">Year:<span class="required-star">*</span></label>
+                        <input type="text" name="year" id="year" class="form-control" value="{{ old('year') }}" required>
                     </div>
                     <div class="form-group">
-                        <label for="price">Price (PKR):</label>
-                        <input type="number" name="price" id="price" class="form-control" required min="0" step="0.01">
+                        <label for="price">Price (PKR):<span class="required-star">*</span></label>
+                        <input type="text" name="price" id="price" class="form-control" value="{{ old('price') }}" required>
                     </div>
                     <div class="form-group">
-                        <label for="kilometers">Kilometers:</label>
-                        <input type="number" name="kilometers" id="kilometers" class="form-control" required min="0">
+                        <label for="kilometers">Kilometers:<span class="required-star">*</span></label>
+                        <input type="text" name="kilometers" id="kilometers" class="form-control" value="{{ old('kilometers') }}" required>
                     </div>
                     <div class="form-group">
-                        <label for="color">Color:</label>
-                        <input type="text" name="color" id="color" class="form-control" required>
+                        <label for="color">Color:<span class="required-star">*</span></label>
+                        <input type="text" name="color" id="color" class="form-control" value="{{ old('color') }}" required>
                     </div>
                     <div class="form-group">
-                        <label for="body_condition">Body Condition:</label>
+                        <label for="body_condition">Body Condition:<span class="required-star">*</span></label>
                         <select name="body_condition" id="body_condition" class="form-control" required>
-                            <option value="Best">Best</option>
-                            <option value="Good">Good</option>
-                            <option value="Fair">Fair</option>
+                            <option value="Best" {{ old('body_condition') === 'Best' ? 'selected' : '' }}>Best</option>
+                            <option value="Good" {{ old('body_condition') === 'Good' ? 'selected' : '' }}>Good</option>
+                            <option value="Fair" {{ old('body_condition') === 'Fair' ? 'selected' : '' }}>Fair</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="mechanical_condition">Mechanical Condition:</label>
+                        <label for="mechanical_condition">Mechanical Condition:<span class="required-star">*</span></label>
                         <select name="mechanical_condition" id="mechanical_condition" class="form-control" required>
-                            <option value="Best">Best</option>
-                            <option value="Good">Good</option>
-                            <option value="Fair">Fair</option>
+                            <option value="Best" {{ old('mechanical_condition') === 'Best' ? 'selected' : '' }}>Best</option>
+                            <option value="Good" {{ old('mechanical_condition') === 'Good' ? 'selected' : '' }}>Good</option>
+                            <option value="Fair" {{ old('mechanical_condition') === 'Fair' ? 'selected' : '' }}>Fair</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="engine_size">Engine Size (L):</label>
-                        <input type="number" step="0.1" name="engine_size" id="engine_size" class="form-control" required min="0">
+                        <label for="engine_size">Engine Size (L):<span class="required-star">*</span></label>
+                        <input type="text" name="engine_size" id="engine_size" class="form-control" value="{{ old('engine_size') }}" required>
                     </div>
                     <div class="form-group">
-                        <label for="horsepower">Horsepower:</label>
-                        <input type="number" name="horsepower" id="horsepower" class="form-control" required min="0">
+                        <label for="horsepower">Horsepower:<span class="required-star">*</span></label>
+                        <input type="text" name="horsepower" id="horsepower" class="form-control" value="{{ old('horsepower') }}" required>
                     </div>
                     <div class="form-group">
-                        <label for="top_speed">Top Speed (km/h):</label>
-                        <input type="number" name="top_speed" id="top_speed" class="form-control" required min="0">
+                        <label for="top_speed">Top Speed (km/h):<span class="required-star">*</span></label>
+                        <input type="text" name="top_speed" id="top_speed" class="form-control" value="{{ old('top_speed') }}" required>
                     </div>
                     <div class="form-group">
-                        <label for="steering_side">Steering Side:</label>
+                        <label for="steering_side">Steering Side:<span class="required-star">*</span></label>
                         <select name="steering_side" id="steering_side" class="form-control" required>
-                            <option value="left">Left</option>
-                            <option value="right">Right</option>
+                            <option value="left" {{ old('steering_side') === 'left' ? 'selected' : '' }}>Left</option>
+                            <option value="right" {{ old('steering_side') === 'right' ? 'selected' : '' }}>Right</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="wheel_size">Wheel Size (inches):</label>
-                        <input type="text" name="wheel_size" id="wheel_size" class="form-control" required>
+                        <label for="wheel_size">Wheel Size (inches):<span class="required-star">*</span></label>
+                        <input type="text" name="wheel_size" id="wheel_size" class="form-control" value="{{ old('wheel_size') }}" required>
                     </div>
                     <div class="form-group">
-                        <label for="interior_color">Interior Color:</label>
-                        <input type="text" name="interior_color" id="interior_color" class="form-control" required>
+                        <label for="interior_color">Interior Color:<span class="required-star">*</span></label>
+                        <input type="text" name="interior_color" id="interior_color" class="form-control" value="{{ old('interior_color') }}" required>
                     </div>
                     <div class="form-group">
-                        <label for="seats">Seats:</label>
-                        <input type="number" name="seats" id="seats" class="form-control" required min="1">
+                        <label for="seats">Seats:<span class="required-star">*</span></label>
+                        <input type="text" name="seats" id="seats" class="form-control" value="{{ old('seats') }}" required>
                     </div>
                     <div class="form-group">
-                        <label for="doors">Doors:</label>
-                        <input type="number" name="doors" id="doors" class="form-control" required min="1">
+                        <label for="doors">Doors:<span class="required-star">*</span></label>
+                        <input type="text" name="doors" id="doors" class="form-control" value="{{ old('doors') }}" required>
                     </div>
                     <div class="section-title">Showroom Details (Optional)</div>
                     <div class="form-group">
                         <label for="showroom_info">Showroom/Company Info:</label>
-                        <textarea name="showroom_info" id="showroom_info" class="form-control" rows="4" placeholder="e.g., Bilal Cars, 50 years experience, luxury vehicles"></textarea>
+                        <textarea name="showroom_info" id="showroom_info" class="form-control" rows="4" placeholder="e.g., Bilal Cars, 50 years experience, luxury vehicles">{{ old('showroom_info') }}</textarea>
                     </div>
                     <div class="form-group">
                         <label for="showroom_office">Office Contact:</label>
-                        <input type="text" name="showroom_office" id="showroom_office" class="form-control" placeholder="e.g., +92 123 456 7890">
+                        <input type="text" name="showroom_office" id="showroom_office" class="form-control" value="{{ old('showroom_office') }}" placeholder="e.g., +92 123 456 7890">
                     </div>
                     <div class="form-group">
                         <label for="showroom_sales">Sales Contact:</label>
-                        <input type="text" name="showroom_sales" id="showroom_sales" class="form-control" placeholder="e.g., +92 987 654 3210">
+                        <input type="text" name="showroom_sales" id="showroom_sales" class="form-control" value="{{ old('showroom_sales') }}" placeholder="e.g., +92 987 654 3210">
                     </div>
                     <div class="form-group">
                         <label for="showroom_website">Website:</label>
-                        <input type="url" name="showroom_website" id="showroom_website" class="form-control" placeholder="e.g., www.bilalcars.pk">
+                        <input type="text" name="showroom_website" id="showroom_website" class="form-control" value="{{ old('showroom_website') }}" placeholder="e.g., www.bilalcars.pk">
                     </div>
                     <div class="form-group">
                         <label for="showroom_location">Location (Map Link):</label>
-                        <input type="url" name="showroom_location" id="showroom_location" class="form-control" placeholder="e.g., https://goo.gl/maps/IslamabadI10">
+                        <input type="text" name="showroom_location" id="showroom_location" class="form-control" value="{{ old('showroom_location') }}" placeholder="e.g., https://goo.gl/maps/IslamabadI10">
                     </div>
                     <div class="form-group">
                         <label for="showroom_social_instagram">Instagram:</label>
-                        <input type="text" name="showroom_social_instagram" id="showroom_social_instagram" class="form-control" placeholder="e.g., instagram.com/bilal_cars">
+                        <input type="text" name="showroom_social_instagram" id="showroom_social_instagram" class="form-control" value="{{ old('showroom_social_instagram') }}" placeholder="e.g., instagram.com/bilal_cars">
                     </div>
                     <div class="form-group">
                         <label for="showroom_social_facebook">Facebook:</label>
-                        <input type="text" name="showroom_social_facebook" id="showroom_social_facebook" class="form-control" placeholder="e.g., facebook.com/bilal_cars">
+                        <input type="text" name="showroom_social_facebook" id="showroom_social_facebook" class="form-control" value="{{ old('showroom_social_facebook') }}" placeholder="e.g., facebook.com/bilal_cars">
                     </div>
                     <button type="submit" class="btn btn-primary">Add Car</button>
                 </form>
             </div>
         </div>
     </div>
+    <script>
+        // Removed real-time validation to allow any input
+    </script>
 </body>
 </html>
