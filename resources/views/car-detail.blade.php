@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Car Details</title>
+    <title>Car Details - {{ $car->year }} {{ $car->make }} {{ $car->model }}</title>
     <link href="{{ asset('css/app.css') }}" rel="stylesheet">
     <style>
         .container { max-width: 800px; margin: 25px auto; }
@@ -14,6 +14,10 @@
         .car-info p strong { background: #eef1f4ff; color: #000; padding: 4px 8px; border-radius: 4px; }
         .section-title { font-size: 1.2rem; color: #003087; margin: 25px 0 12px; font-weight: 600; }
         .description { white-space: pre-wrap; line-height: 1.6; font-size: 1.1rem; color: #333; background: #f0f0f0; padding: 12px; border-radius: 6px; }
+        .additional-details { margin-top: 20px; padding: 12px; background: #e9ecef; border-radius: 6px; font-size: 1.1rem; color: #333; }
+        .additional-details ul { list-style-type: none; padding: 0; }
+        .additional-details li { margin: 5px 0; }
+        .showroom-contact { margin-top: 20px; padding: 12px; background: #e9ecef; border-radius: 6px; font-size: 1.1rem; color: #333; }
         .btn-primary { background: #007bff; color: #fff; padding: 12px 25px; border: none; border-radius: 6px; transition: background 0.3s; }
         .btn-primary:hover { background: #0056b3; }
         .alert-success { background: #d4edda; color: #155724; padding: 12px; border-radius: 6px; margin-bottom: 18px; }
@@ -68,6 +72,22 @@
                 </div>
                 <div class="section-title">Description</div>
                 <div class="description">{!! nl2br(e(str_replace('$', '', $car->description))) !!}</div>
+                <div class="section-title">Extra Features</div>
+                <div class="additional-details">
+                    <ul>
+                        @foreach (explode("\n", $additionalDetails) as $detail)
+                            @if (trim($detail) !== '')
+                                <li>{{ trim($detail) }}</li>
+                            @endif
+                        @endforeach
+                    </ul>
+                </div>
+                @if (strpos($car->description, 'About the Showroom') !== false)
+                    <div class="section-title">Showroom</div>
+                    <div class="showroom-contact">
+                        {!! nl2br(e(str_replace('$', '', substr($car->description, strpos($car->description, 'About the Showroom'))))) !!}
+                    </div>
+                @endif
                 <a href="{{ route('cars.index') }}" class="btn btn-primary mt-3">Back to Listings</a>
                 <button class="btn btn-edit mt-3" onclick="toggleEditForm()">Edit</button>
                 <form action="{{ route('cars.update', $car->id) }}" method="POST" class="edit-form" id="editForm" style="display: none;">
@@ -156,6 +176,30 @@
                     <div class="form-group">
                         <label for="showroom_info">Showroom Info</label>
                         <textarea name="showroom_info" id="showroom_info" class="form-control">{{ old('showroom_info', $car->showroom_info) }}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="showroom_office">Office Contact</label>
+                        <input type="text" name="showroom_office" id="showroom_office" class="form-control" value="{{ old('showroom_office', $car->showroom_office) }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="showroom_sales">Sales Contact</label>
+                        <input type="text" name="showroom_sales" id="showroom_sales" class="form-control" value="{{ old('showroom_sales', $car->showroom_sales) }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="showroom_website">Website</label>
+                        <input type="text" name="showroom_website" id="showroom_website" class="form-control" value="{{ old('showroom_website', $car->showroom_website) }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="showroom_location">Location (Map Link)</label>
+                        <input type="text" name="showroom_location" id="showroom_location" class="form-control" value="{{ old('showroom_location', $car->showroom_location) }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="showroom_social_instagram">Instagram</label>
+                        <input type="text" name="showroom_social_instagram" id="showroom_social_instagram" class="form-control" value="{{ old('showroom_social_instagram', $car->showroom_social_instagram) }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="showroom_social_facebook">Facebook</label>
+                        <input type="text" name="showroom_social_facebook" id="showroom_social_facebook" class="form-control" value="{{ old('showroom_social_facebook', $car->showroom_social_facebook) }}">
                     </div>
                     <button type="submit" class="btn-save">Save Changes</button>
                     <button type="button" class="btn-cancel" onclick="toggleEditForm()">Cancel</button>

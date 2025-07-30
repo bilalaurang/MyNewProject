@@ -28,12 +28,12 @@ class CarsController extends Controller
 
         try {
             $validated = $request->validate([
-                'make' => 'required|string|regex:/^[a-zA-Z\s]+$/|max:255',
-                'model' => 'required|string|regex:/^[a-zA-Z\s]+$/|max:255',
+                'make' => 'required|string|max:255',
+                'model' => 'required|string|max:255',
                 'year' => 'required|integer|min:1900|max:' . (date('Y') + 1),
                 'price' => 'required|numeric|min:0',
                 'kilometers' => 'required|numeric|min:0',
-                'color' => 'required|string|regex:/^[a-zA-Z\s]+$/|max:255',
+                'color' => 'required|string|max:255',
                 'body_condition' => 'required|string|regex:/^[a-zA-Z\s]+$/|max:255',
                 'mechanical_condition' => 'required|string|regex:/^[a-zA-Z\s]+$/|max:255',
                 'engine_size' => 'required|numeric|min:0',
@@ -45,6 +45,12 @@ class CarsController extends Controller
                 'seats' => 'required|integer|min:1',
                 'doors' => 'required|integer|min:1',
                 'showroom_info' => 'nullable|string|max:1000',
+                'showroom_office' => 'nullable|string|max:255',
+                'showroom_sales' => 'nullable|string|max:255',
+                'showroom_website' => 'nullable|url|max:255',
+                'showroom_location' => 'nullable|url|max:255',
+                'showroom_social_instagram' => 'nullable|url|max:255',
+                'showroom_social_facebook' => 'nullable|url|max:255',
             ]);
 
             $description = $this->generateAIDescription($validated);
@@ -66,30 +72,28 @@ class CarsController extends Controller
 
     public function show(Car $car)
     {
-        // Fetch the latest data from the database
-        $car = Car::findOrFail($car->id);
+        $car = Car::findOrFail($car->getKey());
         Log::info('Show: Car details (refetched)', $car->toArray());
-        return view('car-detail', compact('car'));
+        $additionalDetails = $this->generateAdditionalDetails($car->toArray());
+        return view('car-detail', compact('car', 'additionalDetails'));
     }
 
     public function update(Request $request, Car $car)
     {
         Log::info('Update: Received request data', $request->all());
 
-        // Get current and submitted description
         $currentDescription = $car->description ?? '';
         $submittedDescription = $request->input('description');
         $isDescriptionModified = $request->input('description_modified', '0') === '1';
 
-        // Validate all fields except description
         try {
             $validatedData = $request->validate([
-                'make' => 'required|string|regex:/^[a-zA-Z\s]+$/|max:255',
-                'model' => 'required|string|regex:/^[a-zA-Z\s]+$/|max:255',
+                'make' => 'required|string|max:255',
+                'model' => 'required|string|max:255',
                 'year' => 'required|integer|min:1900|max:' . (date('Y') + 1),
                 'price' => 'required|numeric|min:0',
                 'kilometers' => 'required|numeric|min:0',
-                'color' => 'required|string|regex:/^[a-zA-Z\s]+$/|max:255',
+                'color' => 'required|string|max:255',
                 'body_condition' => 'required|string|regex:/^[a-zA-Z\s]+$/|max:255',
                 'mechanical_condition' => 'required|string|regex:/^[a-zA-Z\s]+$/|max:255',
                 'engine_size' => 'required|numeric|min:0',
@@ -101,9 +105,14 @@ class CarsController extends Controller
                 'seats' => 'required|integer|min:1',
                 'doors' => 'required|integer|min:1',
                 'showroom_info' => 'nullable|string|max:1000',
+                'showroom_office' => 'nullable|string|max:255',
+                'showroom_sales' => 'nullable|string|max:255',
+                'showroom_website' => 'nullable|url|max:255',
+                'showroom_location' => 'nullable|url|max:255',
+                'showroom_social_instagram' => 'nullable|url|max:255',
+                'showroom_social_facebook' => 'nullable|url|max:255',
             ]);
 
-            // Handle description only if modified
             $description = $currentDescription;
             if ($isDescriptionModified && $submittedDescription !== null) {
                 if (strlen($submittedDescription) > 1000) {
@@ -118,8 +127,8 @@ class CarsController extends Controller
 
             $car->fill($dataToUpdate);
             $car->save();
-            $updatedCar = Car::findOrFail($car->id);
-            Log::info('Update: Car updated successfully', ['car_id' => $car->id, 'updated_data' => $updatedCar->toArray()]);
+            $updatedCar = Car::findOrFail($car->getKey());
+            Log::info('Update: Car updated successfully', ['car_id' => $car->getKey(), 'updated_data' => $updatedCar->toArray()]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             Log::error('Update: Validation failed', ['errors' => $e->errors(), 'input' => $request->all()]);
             return redirect()->back()->withErrors($e->errors())->withInput();
@@ -128,95 +137,131 @@ class CarsController extends Controller
             return redirect()->back()->with('error', 'Failed to update car. Check logs: ' . $e->getMessage())->withInput();
         }
 
-        // Force refresh with cache-busting parameter
         $cacheBust = time();
-        return redirect()->route('cars.show', [$car->id, 'cache' => $cacheBust])->with('success', 'Car updated successfully!');
+        return redirect()->route('cars.show', [$car->getKey(), 'cache' => $cacheBust])->with('success', 'Car added successfully!');
     }
 
     private function generateAIDescription($data)
     {
-        $carPrompt = "Generate a 50-100 word description for a {$data['year']} {$data['make']} {$data['model']} with {$data['kilometers']} km, {$data['color']} color, {$data['body_condition']} body condition, {$data['mechanical_condition']} mechanical condition, {$data['engine_size']}L engine, {$data['horsepower']} hp, top speed of {$data['top_speed']} km/h, {$data['steering_side']} steering, {$data['wheel_size']} inch wheels, {$data['interior_color']} interior, {$data['seats']} seats, and {$data['doors']} doors. Price: \${$data['price']}. Create a unique, engaging description with varied tone, style, and additional details (e.g., driving experience, design highlights) to differentiate it from other car descriptions.";
+        $systemPrompt = "You are an AI assistant tasked with generating car and showroom descriptions for a car dealership website. Follow these strict boundaries:
+            - Use only simple, human-like language with a friendly tone.
+            - Avoid dashes (-), bullet points, or any AI formatting.
+            - Keep car descriptions between 50 and 100 words, and showroom descriptions between 50 and 70 words.
+            - Include SEO-friendly terms like 'affordable used cars', 'reliable car dealership', or 'luxury car features'.
+            - Automatically correct unrealistic inputs (e.g., high horsepower for a small engine) based on your knowledge of typical car specifications.
+            - If you lack specific data about a feature, skip it silently without mention.
+            - Do not include personal opinions, jokes, or unrelated content.
+            - Focus solely on the provided data and generate professional, relevant content.";
+
+        $showroomSystemPrompt = "You are an AI assistant generating a single showroom description for a car dealership website. Follow these strict boundaries:
+            - Use only simple, human-like language with a friendly tone.
+            - Avoid dashes (-), bullet points, or any AI formatting.
+            - Limit to one paragraph of 50-70 words.
+            - Include SEO-friendly terms like 'affordable used cars', 'reliable car dealership', or 'high-quality vehicles'.
+            - Base the description on the provided showroom info, emphasizing location, quality, and an invitation to visit.
+            - Do not include personal opinions, jokes, or unrelated content.
+            - Ensure the description is realistic and professional.";
+
+        $carPrompt = "$systemPrompt Create a description for a {$data['year']} {$data['make']} {$data['model']} with {$data['kilometers']} km, {$data['color']} color, {$data['body_condition']} body condition, {$data['mechanical_condition']} mechanical condition, {$data['engine_size']}L engine, {$data['horsepower']} hp, top speed of {$data['top_speed']} km/h, {$data['steering_side']} steering, {$data['wheel_size']} inch wheels, a {$data['interior_color']} interior, {$data['seats']} seats, and {$data['doors']} doors. Price: \${$data['price']}. Use the provided data and adjust any unrealistic specs based on typical car standards.";
+
+        $maxRetries = 3; // Increased to 3 for better reliability
+        $retryDelay = 2; // seconds
+        $carDescription = $this->callDeepSeekAPIWithRetry($carPrompt, 'Car Description', $data, $maxRetries, $retryDelay);
         
-        $carDescription = $this->callGeminiAPI($carPrompt, 'Car Description', $data);
-        
+        $showroomDescription = '';
         if (!empty($data['showroom_info'])) {
-            $showroomPrompt = "Generate a 50-70 word professional description for a car showroom or company based on the following raw input: '{$data['showroom_info']}'. Include a professional tone, highlight expertise, quality, or unique aspects, and end with an invitation to visit or explore their collection.";
-            $showroomDescription = $this->callGeminiAPI($showroomPrompt, 'Showroom Description', $data);
-            $showroomSection = "\n\nAbout the Showroom\n$showroomDescription\n\nContact Us\nOffice: Not provided\nSales: Not provided\nWebsite: www.example.com\nLocation: Not provided\nOpen: 7 days a week, 10 AM to 9 PM (Sunday 10 AM to 7 PM)\n\nStay Connected\nInstagram: instagram.com/example\nFacebook: facebook.com/example";
+            $cleanedShowroomInfo = str_replace(["\r\n", "\r", "\n"], " ", $data['showroom_info']);
+            $showroomPrompt = "$showroomSystemPrompt Generate a single paragraph based on this input: '$cleanedShowroomInfo'.";
+            $generatedDescription = $this->callDeepSeekAPIWithRetry($showroomPrompt, 'Showroom Description', $data, $maxRetries, $retryDelay);
+            // Validate relevance: check for dealership-related keywords and word count
+            $relevantKeywords = ['dealership', 'showroom', 'cars', 'vehicles'];
+            $isRelevant = trim($generatedDescription) && strpos($generatedDescription, 'API failed') === false;
+            $wordCount = str_word_count($generatedDescription);
+            $hasKeyword = false;
+            foreach ($relevantKeywords as $keyword) {
+                if (stripos($generatedDescription, $keyword) !== false) {
+                    $hasKeyword = true;
+                    break;
+                }
+            }
+            if ($isRelevant && $hasKeyword && $wordCount >= 50 && $wordCount <= 70) {
+                $showroomDescription = $generatedDescription;
+            }
+        }
+        
+        $showroomSection = '';
+        if (!empty($showroomDescription) || (!empty($data['showroom_office']) || !empty($data['showroom_sales']) || !empty($data['showroom_website']) || !empty($data['showroom_location']) || !empty($data['showroom_social_instagram']) || !empty($data['showroom_social_facebook']))) {
+            $showroomSection .= "\n\nAbout the Showroom\n" . $showroomDescription;
+            $contactDetails = [];
+            if (!empty($data['showroom_office'])) $contactDetails[] = "Office: {$data['showroom_office']}";
+            if (!empty($data['showroom_sales'])) $contactDetails[] = "Sales: {$data['showroom_sales']}";
+            if (!empty($data['showroom_website'])) $contactDetails[] = "Website: {$data['showroom_website']}";
+            if (!empty($data['showroom_location'])) $contactDetails[] = "Location: {$data['showroom_location']}";
+            if (!empty($data['showroom_social_instagram'])) $contactDetails[] = "Instagram: {$data['showroom_social_instagram']}";
+            if (!empty($data['showroom_social_facebook'])) $contactDetails[] = "Facebook: {$data['showroom_social_facebook']}";
+            if (!empty($contactDetails)) {
+                $showroomSection .= "\n" . implode("\n", $contactDetails);
+            }
             return $carDescription . $showroomSection;
         }
         
         return $carDescription;
     }
 
-    private function callGeminiAPI($prompt, $logContext, $data)
+    private function generateAdditionalDetails($data)
     {
-        Log::info("Attempting Gemini API call for $logContext", ['prompt' => $prompt]);
-        try {
-            $response = Http::withHeaders([
-                'Content-Type' => 'application/json',
-                'x-goog-api-key' => env('GEMINI_API_KEY'),
-            ])->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent', [
-                'contents' => [
-                    [
-                        'parts' => [
-                            ['text' => $prompt],
-                        ],
-                    ],
-                ],
-                'generationConfig' => [
-                    'maxOutputTokens' => 200,
-                    'temperature' => 0.9,
-                ],
-            ]);
-            $result = $response->json();
-            Log::info("Gemini API Response for $logContext", ['response' => $result]);
-            if (isset($result['candidates'][0]['content']['parts'][0]['text'])) {
-                return trim($result['candidates'][0]['content']['parts'][0]['text']);
+        $systemPrompt = "You are an AI assistant generating extra car features for a dealership website. Follow these strict boundaries:
+            - Use simple, human-like language with a friendly tone.
+            - Avoid dashes (-), bullet points in paragraphs, or AI formatting.
+            - Present features as a list, one per line, with no numbering or special characters.
+            - Include only realistic features based on the car's year and model.
+            - Use SEO-friendly terms like 'luxury car features' or 'advanced car technology'.
+            - Limit to features that enhance appeal (e.g., no basic requirements like brakes).
+            - Do not include personal opinions or unrelated content.";
+
+        $additionalPrompt = "$systemPrompt Generate as many extra features as possible for a {$data['year']} {$data['make']} {$data['model']} to enhance its appeal. Include options like heated seats, automatic seats, sunroof, navigation, backup camera, leather seats, keyless entry, climate control, touch screen display, parking sensors, adaptive cruise control, premium sound system, roof rails, alloy wheels, ambient lighting, wireless charging, rear entertainment, panoramic roof, blind spot monitoring, lane keep assist, adaptive headlights, power folding mirrors, rain sensing wipers, sport exhaust, sport chrono package.";
+
+        $maxRetries = 3; // Increased to 3 for better reliability
+        $retryDelay = 2; // seconds
+        $features = $this->callDeepSeekAPIWithRetry($additionalPrompt, 'Additional Details', $data, $maxRetries, $retryDelay);
+        return $features;
+    }
+
+    private function callDeepSeekAPIWithRetry($prompt, $logContext, $data, $maxRetries, $retryDelay)
+    {
+        $attempt = 0;
+        while ($attempt <= $maxRetries) {
+            try {
+                Log::info("Attempting DeepSeek API call for $logContext (Attempt $attempt)", ['prompt' => $prompt]);
+                $response = Http::withHeaders([
+                    'Content-Type' => 'application/json',
+                    'Authorization' => 'Bearer ' . env('OPENROUTER_API_KEY'),
+                ])->timeout(30)
+                  ->post(env('OPENROUTER_API_URL'), [
+                      'model' => env('DEEPSEEK_MODEL', 'deepseek-chat:free'),
+                      'messages' => [
+                          ['role' => 'system', 'content' => 'You are an AI assistant.'],
+                          ['role' => 'user', 'content' => $prompt],
+                      ],
+                      'max_tokens' => 150,
+                      'temperature' => 0.9,
+                  ]);
+                $result = $response->json();
+                Log::info("DeepSeek API Response for $logContext (Attempt $attempt)", ['response' => $result]);
+                if (isset($result['choices'][0]['message']['content'])) {
+                    return trim($result['choices'][0]['message']['content']);
+                }
+                throw new \Exception("No valid response from DeepSeek API for $logContext. Response: " . json_encode($result));
+            } catch (\Exception $e) {
+                Log::error("API Error for $logContext (Attempt $attempt): " . $e->getMessage(), ['data' => $data]);
+                if ($attempt === $maxRetries) {
+                    Log::critical("Max retries reached for $logContext, API failed", ['error' => $e->getMessage()]);
+                    return "API failed after $maxRetries attempts. Check logs for details.";
+                }
+                sleep($retryDelay);
+                $attempt++;
             }
-            throw new \Exception("No description returned from Gemini API for $logContext");
-        } catch (\Exception $e) {
-            Log::error("AI Description Error for $logContext: " . $e->getMessage());
-            if ($logContext === 'Car Description') {
-                $introPhrases = [
-                    'Step into the driver’s seat of this',
-                    'Unleash the potential of this',
-                    'Experience the allure of this',
-                    'Command the road with this',
-                    'Discover the charm of this',
-                    'Feel the pulse of this',
-                ];
-                $stylePhrases = [
-                    'boasting sleek lines and bold styling',
-                    'with a timeless design that turns heads',
-                    'featuring aggressive contours and sporty flair',
-                    'crafted with elegance and sophistication',
-                    'showcasing a rugged yet refined look',
-                ];
-                $drivePhrases = [
-                    'perfect for thrilling weekend drives',
-                    'ideal for smooth city commutes',
-                    'built for high-performance adventures',
-                    'designed for comfort on long journeys',
-                    'tailored for dynamic handling and fun',
-                ];
-                $closingPhrases = [
-                    'Grab this automotive masterpiece today!',
-                    'Your dream ride awaits—don’t miss out!',
-                    'A rare find for enthusiasts and collectors!',
-                    'Ready to redefine your driving experience!',
-                    'Seize this chance to own a legend!',
-                ];
-                $intro = $introPhrases[array_rand($introPhrases)];
-                $style = $stylePhrases[array_rand($stylePhrases)];
-                $drive = $drivePhrases[array_rand($drivePhrases)];
-                $closing = $closingPhrases[array_rand($closingPhrases)];
-                $conditionAdjective = strtolower($data['body_condition']) === 'best' ? 'pristine' : 'well-maintained';
-                $powerAdjective = $data['horsepower'] > 500 ? 'exhilarating' : 'reliable';
-                $priceAdjective = $data['price'] < 5000 ? 'budget-friendly' : 'premium';
-                return "$intro $conditionAdjective {$data['year']} {$data['make']} {$data['model']} with only {$data['kilometers']} km. Priced at \${$data['price']}, this $priceAdjective ride offers a $powerAdjective {$data['engine_size']}L engine with {$data['horsepower']} hp and a top speed of {$data['top_speed']} km/h. It features {$data['steering_side']} steering, {$data['wheel_size']} inch wheels, a {$data['interior_color']} interior, {$data['seats']} seats, and {$data['doors']} doors, $style. $drive. $closing";
-            }
-            return "Showroom information unavailable.";
         }
+        return "API request failed unexpectedly.";
     }
 }
