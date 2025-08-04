@@ -12,27 +12,22 @@
         .car-info { margin-bottom: 20px; }
         .car-info p { margin: 6px 0; font-size: 1.1rem; }
         .car-info p strong { background: #eef1f4ff; color: #000; padding: 4px 8px; border-radius: 4px; }
-        .section-title { font-size: 1.2rem; color: #003087; margin: 25px 0 0; font-weight: 600; }
+        .section-title { font-size: 1.2rem; color: #003087; margin: 25px 0 12px; font-weight: 600; }
         .description { 
+            white-space: pre-wrap; 
             font-size: 1.1rem; 
             color: #333; 
             background: #f0f0f0; 
+            padding: 0 12px 12px; 
             border-radius: 6px; 
             text-align: left; 
             line-height: 1.2; 
             margin: 0; 
-            padding: 0; 
-            overflow: auto; /* Changed from hidden to allow scrolling */
-            max-height: 300px; /* Increased height to fit content */
-        }
-        .description-content { 
-            padding: 12px; /* Internal padding for content */
-            margin: 0; /* Remove any margin */
         }
         .additional-details { 
             margin-top: 20px; 
             padding: 12px; 
-            background: #e9ecef; 
+            background: #5b9dd3ff; 
             border-radius: 6px; 
             font-size: 1.1rem; 
             color: #333; 
@@ -77,7 +72,7 @@
                     </div>
                 @endif
                 <div class="car-info">
-                    <p><strong>Price:</strong> {{ number_format($car->price, 2) }} PKR</p>
+                    <p><strong>Price:</strong> {{ number_format(floatval($car->price), 2) }} PKR</p>
                     <p><strong>Kilometers:</strong> {{ number_format($car->kilometers) }} km</p>
                     <p><strong>Color:</strong> {{ $car->color }}</p>
                     <p><strong>Body Condition:</strong> {{ $car->body_condition }}</p>
@@ -94,36 +89,30 @@
                 @if(!empty($descriptions['description']) || !empty($descriptions['showroom']))
                     <div class="section-title">Description 1</div>
                     <div class="description">
-                        <div class="description-content">
-                            @if(!empty($descriptions['description']))
-                                {!! str_replace('$', '', $descriptions['description']) !!}<br>
-                            @endif
-                            @if(!empty($descriptions['showroom']))
-                                {!! str_replace('$', '', $descriptions['showroom']) !!}<br>
-                            @endif
-                        </div>
+                        @if(!empty($descriptions['description']))
+                            {!! nl2br(e(str_replace('$', '', $descriptions['description']))) !!}<br>
+                        @endif
+                        @if(!empty($descriptions['showroom']))
+                            {!! nl2br(e(str_replace('$', '', $descriptions['showroom']))) !!}<br>
+                        @endif
                     </div>
                 @endif
                 @if(!empty($descriptions['main_features']))
                     <div class="section-title">Description 2</div>
                     <div class="description">
-                        <div class="description-content">
-                            <ul>
-                                @foreach (explode("\n", $descriptions['main_features']) as $feature)
-                                    @if (trim($feature) !== '' && strpos(trim($feature), '•') === 0)
-                                        <li>{{ trim(str_replace('•', '', $feature)) }}</li>
-                                    @endif
-                                @endforeach
-                            </ul>
-                        </div>
+                        <ul>
+                            @foreach (explode("\n", $descriptions['main_features']) as $feature)
+                                @if (trim($feature) !== '' && strpos(trim($feature), '•') === 0)
+                                    <li>{{ trim(str_replace('•', '', $feature)) }}</li>
+                                @endif
+                            @endforeach
+                        </ul>
                     </div>
                 @endif
                 @if(!empty($descriptions['mixed_overview']))
                     <div class="section-title">Description 3</div>
                     <div class="description">
-                        <div class="description-content">
-                            {{ str_replace('$', '', $descriptions['mixed_overview']) }}
-                        </div>
+                        {!! nl2br(e(str_replace('$', '', $descriptions['mixed_overview']))) !!}
                     </div>
                 @endif
                 @if(!empty($additionalDetails))
@@ -158,7 +147,7 @@
                     </div>
                     <div class="form-group">
                         <label for="price">Price (PKR)</label>
-                        <input type="text" name="price" id="price" class="form-control" value="{{ old('price', $car->price) }}" required>
+                        <input type="text" name="price" id="price" class="form-control" value="{{ old('price', str_replace(' PKR', '', $car->price)) }}" required>
                     </div>
                     <div class="form-group">
                         <label for="kilometers">Kilometers</label>
