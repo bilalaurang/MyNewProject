@@ -77,7 +77,7 @@ class CarsController extends Controller
     {
         $car = Car::findOrFail($car->getKey());
         // Ensure price is displayed as PKR
-        $car['price']= number_format($car['price'], 2) . ' PKR';
+        $car['price'] = number_format($car['price'], 2) . ' PKR';
         Log::info('Show: Car details (refetched)', $car->toArray());
         $additionalDetails = $this->generateAdditionalDetails($car->toArray());
         $descriptions = $this->generateAIDescription($car->toArray());
@@ -136,106 +136,37 @@ class CarsController extends Controller
 
     private function generateAIDescription($data)
     {
-        // AI-driven validation using xAI automotive knowledge
-        $year = (int)$data['year'];
-        $make = strtolower($data['make']);
-        $model = strtolower($data['model']);
-        $engineSize = (float)$data['engine_size'];
-        $horsepower = (int)$data['horsepower'];
-        $topSpeed = (int)$data['top_speed'];
-        $kilometers = (int)$data['kilometers'];
-        $seats = (int)$data['seats'];
-        $doors = (int)$data['doors'];
+        $maxRetries = 3;
+        $retryDelay = 2;
 
-        // Known makes based on xAI knowledge
-        $knownMakes = ['toyota', 'honda', 'ford', 'bmw', 'audi', 'mercedes', 'volkswagen', 'tesla', 'porsche', 'ferrari'];
-        $isValidInput = true;
-        $invalidInputDetail = '';
+        // AI-driven validation for any car input
+        $validationPrompt = "You are an AI assistant with extensive automotive knowledge. Validate the following car input for accuracy based on make, model, year, engine size, horsepower, and top speed. Return 'valid' if correct, or 'invalid' with a reason (e.g., 'make Toyota does not produce model Civic') if incorrect. Input: a {$data['year']} {$data['make']} {$data['model']} with {$data['engine_size']}L engine, {$data['horsepower']} hp, and {$data['top_speed']} km/h top speed.";
 
-        // Check for invalid inputs
-        if (empty($make) || empty($model)) {
-            $isValidInput = false;
-            $invalidInputDetail = empty($make) ? 'make' : 'model';
-        } elseif (!in_array($make, $knownMakes)) {
-            $isValidInput = false;
-            $invalidInputDetail = "make '$make'";
-        } else {
-            // Model-specific validation
-            if ($make === 'toyota' && $model === 'civic') {
-                if ($year < 1972 || $year > 2026) {
-                    $isValidInput = false;
-                    $invalidInputDetail = "year $year for $make $model";
-                } elseif ($year <= 2000 && ($engineSize > 2.0 || $horsepower > 200)) {
-                    $isValidInput = false;
-                    $invalidInputDetail = "engine size $engineSize or horsepower $horsepower for $year $make $model";
-                } elseif ($year > 2000 && ($engineSize > 2.4 || $horsepower > 300)) {
-                    $isValidInput = false;
-                    $invalidInputDetail = "engine size $engineSize or horsepower $horsepower for $year $make $model";
-                }
-            } elseif ($make === 'honda' && $model === 'civic') {
-                if ($year < 1972 || $year > 2026) {
-                    $isValidInput = false;
-                    $invalidInputDetail = "year $year for $make $model";
-                } elseif ($year <= 2000 && ($engineSize > 2.0 || $horsepower > 200)) {
-                    $isValidInput = false;
-                    $invalidInputDetail = "engine size $engineSize or horsepower $horsepower for $year $make $model";
-                } elseif ($year > 2000 && ($engineSize > 2.4 || $horsepower > 300)) {
-                    $isValidInput = false;
-                    $invalidInputDetail = "engine size $engineSize or horsepower $horsepower for $year $make $model";
-                }
-            } elseif ($make === 'toyota' && $model === 'corolla') {
-                if ($year < 1966 || $year > 2026) {
-                    $isValidInput = false;
-                    $invalidInputDetail = "year $year for $make $model";
-                } elseif ($year <= 2000 && ($engineSize > 2.0 || $horsepower > 150)) {
-                    $isValidInput = false;
-                    $invalidInputDetail = "engine size $engineSize or horsepower $horsepower for $year $make $model";
-                } elseif ($year > 2000 && ($engineSize > 2.4 || $horsepower > 200)) {
-                    $isValidInput = false;
-                    $invalidInputDetail = "engine size $engineSize or horsepower $horsepower for $year $make $model";
-                }
-            } elseif ($make === 'ford' && $model === 'focus') {
-                if ($year < 1998 || $year > 2026) {
-                    $isValidInput = false;
-                    $invalidInputDetail = "year $year for $make $model";
-                } elseif ($year <= 2000 && ($engineSize > 2.0 || $horsepower > 130)) {
-                    $isValidInput = false;
-                    $invalidInputDetail = "engine size $engineSize or horsepower $horsepower for $year $make $model";
-                } elseif ($year > 2000 && ($engineSize > 2.5 || $horsepower > 350)) {
-                    $isValidInput = false;
-                    $invalidInputDetail = "engine size $engineSize or horsepower $horsepower for $year $make $model";
-                }
-            } elseif ($year < 1886 || $year > date('Y') + 1) {
-                $isValidInput = false;
-                $invalidInputDetail = "year $year";
-            } elseif ($engineSize <= 0 || $engineSize > 8 || $horsepower <= 0 || $horsepower > 1000 || $topSpeed <= 0 || $topSpeed > 500 || $kilometers < 0 || $kilometers > 1000000 || $seats < 1 || $seats > 9 || $doors < 1 || $doors > 6) {
-                $isValidInput = false;
-                $invalidInputDetail = "specs (engine $engineSize, hp $horsepower, top speed $topSpeed, km $kilometers, seats $seats, doors $doors)";
-            }
-        }
+        $validationResponse = $this->callDeepSeekAPIWithRetry($validationPrompt, 'Input Validation', $data, $maxRetries, $retryDelay);
+        Log::info('Input Validation (Generated)', ['prompt' => $validationPrompt, 'content' => $validationResponse]);
 
-        if (!$isValidInput) {
-            Log::warning('generateAIDescription: Skipping description generation due to invalid input', $data);
+        if (strpos($validationResponse, 'invalid') === 0) {
             return [
-                'description' => "This input $invalidInputDetail does not exist. Please check your input.",
+                'description' => $validationResponse,
                 'showroom' => '',
-                'mixed_overview' => "This input $invalidInputDetail does not exist. Please check your input.",
+                'mixed_overview' => $validationResponse,
                 'main_features' => '',
             ];
         }
 
-        $maxRetries = 3;
-        $retryDelay = 2;
-
-        // 1. Description (Generated by DeepSeek)
+        // Proceed with description generation if input is valid
         $descriptionSystemPrompt = "You are an AI assistant generating a car description for a dealership website based on car specifications. Follow these strict boundaries:
-            - Use simple, human-like language with a friendly tone.
-            - Avoid dashes (-), bullet points, or any AI formatting.
-            - Keep the description between 50 and 70 words.
+            - Use clear, engaging language with a friendly tone.
+            - All lines must be strictly aligned to the left margin.
+            - Start with a single opening line aligned strictly to the left margin, with no indentation or extra spacing.
+            - Include 3-5 bullet points with a single dot (•) each, aligned to the left margin, with descriptions limited to 3-4 words per line.
+            - End with a single closing line aligned to the left margin.
+            - Keep the description between 100 and 150 words to ensure full content.
             - Include SEO-friendly terms like 'high-performance car' or 'luxury vehicle'.
             - Base the description on the provided data: a {$data['year']} {$data['make']} {$data['model']} with {$data['kilometers']} km, {$data['color']} color, {$data['body_condition']} body condition, {$data['mechanical_condition']} mechanical condition, {$data['engine_size']}L engine, {$data['horsepower']} hp, {$data['top_speed']} km/h top speed, {$data['steering_side']} steering, {$data['wheel_size']} inch wheels, {$data['interior_color']} interior, {$data['seats']} seats, and {$data['doors']} doors. Price: {$data['price']} PKR.
             - Do not include showroom details or personal opinions.";
-        $descriptionPrompt = "$descriptionSystemPrompt Generate a detailed car description.";
+        $descriptionPrompt = "$descriptionSystemPrompt Generate a complete car description.";
+
         $description = $this->callDeepSeekAPIWithRetry($descriptionPrompt, 'Description', $data, $maxRetries, $retryDelay);
         Log::info('Description (Generated)', ['prompt' => $descriptionPrompt, 'content' => $description]);
 
@@ -254,14 +185,17 @@ class CarsController extends Controller
             $contactClause = !empty($contactDetails) ? ' Contact us at ' . implode(', ', $contactDetails) . '.' : '';
 
             $showroomSystemPrompt = "You are an AI assistant generating showroom details for a dealership website. Follow these strict boundaries:
-                - Use simple, human-like language with a friendly tone.
-                - Avoid dashes (-), bullet points, or any AI formatting.
-                - Keep the description between 50 and 70 words.
+                - Use clear, inviting language with a professional tone.
+                - Start with 2-3 opening lines aligned to the left margin, introducing the showroom.
+                - All lines must be strictly aligned to the left margin.
+                - Include 3-5 bullet points with a single dot (•) each, aligned to the left margin, with descriptions limited to 3-4 words per line.
+                - End with a single closing line aligned to the left margin.
+                - Keep the description between 50 and 250 words, scaling with input length (minimum 50 words for 1 line of input, 200+ words for 4-5 lines).
                 - Include SEO-friendly terms like 'reliable car dealership' or 'affordable used cars'.
                 - Enhance the user-provided showroom info ('$showroomInfo') with details like experience, services, and location.
                 - Include contact details only if provided: $contactClause
-                - Do not include personal opinions or unrelated content.";
-            $showroomPrompt = "$showroomSystemPrompt Generate a professional showroom description.";
+                - Do not include personal opinions or unrelated content unless contact details are provided.";
+            $showroomPrompt = "$showroomSystemPrompt Generate a complete showroom description.";
             $showroomDescription = $this->callDeepSeekAPIWithRetry($showroomPrompt, 'Showroom Details', $data, $maxRetries, $retryDelay);
             Log::info('Showroom Details (Generated)', ['prompt' => $showroomPrompt, 'content' => $showroomDescription]);
         }
@@ -330,7 +264,7 @@ class CarsController extends Controller
                           ['role' => 'system', 'content' => 'You are an AI assistant.'],
                           ['role' => 'user', 'content' => $prompt],
                       ],
-                      'max_tokens' => 150,
+                      'max_tokens' => 300,
                       'temperature' => 0.9,
                   ]);
                 $result = $response->json();
