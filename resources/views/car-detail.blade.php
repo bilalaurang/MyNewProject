@@ -22,7 +22,8 @@
             line-height: 1.2; 
             margin: 0; 
             padding: 0; 
-            overflow: hidden; /* Prevent overflow issues */
+            overflow: auto; /* Changed from hidden to allow scrolling */
+            max-height: 300px; /* Increased height to fit content */
         }
         .description-content { 
             padding: 12px; /* Internal padding for content */
@@ -95,10 +96,10 @@
                     <div class="description">
                         <div class="description-content">
                             @if(!empty($descriptions['description']))
-                                {{ str_replace('$', '', $descriptions['description']) }}<br>
+                                {!! str_replace('$', '', $descriptions['description']) !!}<br>
                             @endif
                             @if(!empty($descriptions['showroom']))
-                                {{ str_replace('$', '', $descriptions['showroom']) }}<br>
+                                {!! str_replace('$', '', $descriptions['showroom']) !!}<br>
                             @endif
                         </div>
                     </div>

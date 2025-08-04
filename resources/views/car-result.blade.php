@@ -31,7 +31,7 @@
                         <div class="card">
                             <div class="card-body">
                                 <h5 class="card-title">{{ $car->year }} {{ $car->make }} {{ $car->model }}</h5>
-                                <p class="card-text">Price: ${{ $car->price }}</p>
+                                <p class="card-text">Price: {{ $car->price }}</p>
                                 <p class="card-text">Kilometers: {{ $car->kilometers }} km</p>
                                 <a href="{{ route('cars.show', $car->id) }}" class="btn btn-primary">Detail</a>
                             </div>
